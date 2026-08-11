@@ -11,7 +11,11 @@ commands that actually make sense right now.
 
 <sub>macOS 13+ · native Swift + AppKit · zero dependencies · MIT</sub>
 
-<img src="docs/menu.png" width="620" alt="The MowerBar menu">
+<img src="docs/menu.png" width="640" alt="The MowerBar menu: Kiki returning to its dock, Norah charging, Jones working, with the Cancel Return submenu open">
+
+<sub>Three mowers, three states, three colours — and only the commands each one<br>
+can actually accept right now. A mower on its way back gets **Cancel Return**;<br>
+it is never offered **Start**.</sub>
 
 </div>
 
@@ -27,17 +31,41 @@ So: a menu bar icon that shows the mowers and their status, and **tells me when
 one gets stuck**. Pause, stop, send it back to the dock — straight from the menu
 bar, without opening an app.
 
+Here is a real one, start to finish. Kiki was on her way back to the dock at 4%
+battery when she dropped off the network:
+
 <div align="center">
 
-<img src="docs/notify-stuck.png" width="440" alt="Notification reading: Jones paused — Was working · 79% battery.">
+<img src="docs/notify-offline.png" width="440" alt="Notification reading: Kiki went offline — No longer reachable. Last seen returning.">
 
-<sub>This is the one that matters. It arrives when it happens, not when you next look.</sub>
-
-<img src="docs/notify-resume.png" width="440" alt="Notification reading: Jones is back — Now working.">
-
-<sub>And this one means you can stop thinking about it.</sub>
+<sub>This is the one that matters. It arrives when it happens,<br>not when you next think to look.</sub>
 
 </div>
+
+She does not vanish from the menu while she is gone. She keeps her row, in red,
+still showing what she was last seen doing — because "was returning at 4%" is a
+very different problem from "is idle":
+
+<div align="center">
+
+<img src="docs/menu-remembered.png" width="500" alt="The menu with Kiki listed in red as Returning · 4% · last known, its submenu reading Out of reach, Last seen 1 min ago, and offering Forget This Mower.">
+
+<sub>Live mowers first, out-of-reach ones after. No commands are offered<br>to a mower that cannot hear them.</sub>
+
+</div>
+
+And then she made it home:
+
+<div align="center">
+
+<img src="docs/notify-back.png" width="440" alt="Notification reading: Kiki is back — Now charging.">
+
+<sub>Which means you can stop thinking about it.</sub>
+
+</div>
+
+A mower stuck mid-lawn reads **"Kiki is stuck — Paused mid-job, off the dock"**.
+One settling onto its dock to charge says nothing at all, because nothing is wrong.
 
 It uses the **official Mammotion API**. Not affiliated with Mammotion. Getting an
 API key is free — [instructions below](#get-your-api-credentials).
@@ -250,6 +278,12 @@ Past `lastKnownMinutes` that reading is too old to mean anything and it reads
 it sooner from Settings or its own submenu — if it is still reachable it comes
 straight back on the next sync. No commands are ever offered from a remembered
 state.
+
+<div align="center">
+
+<img src="docs/menu-remembered.png" width="520" alt="Kiki shown in red as Returning · 4% · last known, with an Out of reach submenu offering Forget This Mower.">
+
+</div>
 
 ## URL scheme
 
