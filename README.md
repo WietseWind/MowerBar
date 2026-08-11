@@ -17,6 +17,33 @@ commands that actually make sense right now.
 
 ---
 
+## Why
+
+I have a fleet of three Luba 2 mowers working their way around the property, and
+too often I noticed one had got stuck a little too late — hours of good mowing
+weather, gone, because nobody was looking.
+
+So: a menu bar icon that shows the mowers and their status, and **tells me when
+one gets stuck**. Pause, stop, send it back to the dock — straight from the menu
+bar, without opening an app.
+
+<div align="center">
+
+<img src="docs/notify-stuck.png" width="440" alt="Notification reading: Jones paused — Was working · 79% battery.">
+
+<sub>This is the one that matters. It arrives when it happens, not when you next look.</sub>
+
+<img src="docs/notify-resume.png" width="440" alt="Notification reading: Jones is back — Now working.">
+
+<sub>And this one means you can stop thinking about it.</sub>
+
+</div>
+
+It uses the **official Mammotion API**. Not affiliated with Mammotion. Getting an
+API key is free — [instructions below](#get-your-api-credentials).
+
+---
+
 ## 🐉 Here be dragons
 
 Read this bit. Really.
@@ -67,15 +94,6 @@ credentials and talk to Mammotion directly.
   menu carrying its last known state, rather than silently vanishing.
 - Show firmware version, Wi-Fi/cellular signal and dock state per mower.
 - Open at login, and answer a `mowerbar://` URL scheme for scripting.
-
-<div align="center">
-
-<img src="docs/notification.png" width="440" alt="A MowerBar notification reading: Jones is back — Now working.">
-
-<sub>A mower stalling mid-job reaches you without looking at the menu bar —<br>
-and so does it picking back up again.</sub>
-
-</div>
 
 ## What it cannot do
 
