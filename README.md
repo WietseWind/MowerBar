@@ -68,6 +68,15 @@ credentials and talk to Mammotion directly.
 - Show firmware version, Wi-Fi/cellular signal and dock state per mower.
 - Open at login, and answer a `mowerbar://` URL scheme for scripting.
 
+<div align="center">
+
+<img src="docs/notification.png" width="440" alt="A MowerBar notification reading: Jones is back — Now working.">
+
+<sub>A mower stalling mid-job reaches you without looking at the menu bar —<br>
+and so does it picking back up again.</sub>
+
+</div>
+
 ## What it cannot do
 
 - **No map, no zones, no scheduling.** Use the Mammotion app for anything spatial.
