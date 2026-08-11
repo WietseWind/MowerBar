@@ -1,0 +1,28 @@
+# Build products
+.build/
+build/
+*.o
+*.dSYM/
+
+# Signing and notarization material — never commit any of this
+*.p12
+*.cer
+*.certSigningRequest
+*.key
+*.pem
+*.mobileprovision
+ExportOptions.plist
+
+# Runtime state. config.json holds your Mammotion client_id/client_secret,
+# token.json holds a live OAuth token, mowers.json your fleet. None of it
+# belongs in a repository.
+config.json
+token.json
+mowers.json
+
+# Local tooling
+.claude/
+.claude_session
+.DS_Store
+xcuserdata/
+*.xcuserstate
