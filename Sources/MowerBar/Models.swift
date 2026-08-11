@@ -26,7 +26,7 @@ struct DeviceInfo: Decodable, Sendable {
     }
 
     /// The account also returns RTK reference stations from `/v1/mowers`.
-    /// They carry no status, battery or work plan, so they never reach the tray.
+    /// They carry no status, battery or work plan, so they never reach the menu.
     var looksLikeMower: Bool {
         guard let model = model?.lowercased() else { return true }
         return !model.contains("rtk") && !model.contains("refstation")
@@ -122,7 +122,7 @@ enum MowerStatus: String, Sendable {
     }
 }
 
-/// How a mower's state should read in the tray.
+/// How a mower's state should read in the menu bar.
 enum MowerHealth: Sendable {
     case active     // green — doing what it should
     case charging   // blue — on the dock, topping up, nothing to do

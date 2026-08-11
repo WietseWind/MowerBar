@@ -257,7 +257,7 @@ enum MowerIcon {
     /// With no badge this is a template image, so macOS tints it correctly for
     /// light, dark and reduced-transparency menu bars. A badge forces a literal
     /// image, which is why the caller has to supply an already-resolved tint.
-    static func trayImage(height: CGFloat, tint: NSColor, badge: NSColor?) -> NSImage {
+    static func menuBarImage(height: CGFloat, tint: NSColor, badge: NSColor?) -> NSImage {
         let mowerWidth = (height * aspectRatio).rounded()
         let badgeSize = badge == nil ? 0 : max(5, (height * 0.42).rounded())
         let size = NSSize(width: mowerWidth + (badgeSize * 0.5).rounded(), height: height)

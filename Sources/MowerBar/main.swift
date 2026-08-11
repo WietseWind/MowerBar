@@ -19,7 +19,7 @@ if let index = CommandLine.arguments.firstIndex(of: "--render-icons"),
     }
 }
 
-// `MowerBar --status` prints exactly what the tray menu would show.
+// `MowerBar --status` prints exactly what the menu would show.
 //
 // It drives the real FleetMonitor rather than re-querying the API itself, so
 // the remembered-mower merge and the action gating shown here cannot drift from

@@ -31,7 +31,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var builtForIds: [String] = []
     private var builtWithNotificationsBlocked = false
     private var statusLineItem: NSMenuItem?
-    private var trayImageKey = ""
+    private var menuBarImageKey = ""
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         let config = Store.loadConfig()
@@ -70,14 +70,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         // distinction between "broken" and "paused".
         let badge: NSColor? = monitor.alertLevel == nil ? nil : .systemRed
 
-        let height = CGFloat(monitor.config.trayIconHeight)
+        let height = CGFloat(monitor.config.menuBarIconHeight)
         let tint = resolvedTint(for: button)
         // Reassigning an identical image still forces a redraw, which reads as a
         // blink in the menu bar on every poll. Only touch it when it changes.
         let key = "\(height)|\(badge == nil ? "plain" : "alert")|\(tint.hexKey)"
-        if key != trayImageKey {
-            trayImageKey = key
-            button.image = MowerIcon.trayImage(height: height, tint: tint, badge: badge)
+        if key != menuBarImageKey {
+            menuBarImageKey = key
+            button.image = MowerIcon.menuBarImage(height: height, tint: tint, badge: badge)
             button.imagePosition = .imageOnly
         }
 

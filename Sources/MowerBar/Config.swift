@@ -10,10 +10,10 @@ struct AppConfig: Codable, Equatable, Sendable {
     var acceptLanguage: String
     /// How often the fleet is polled, in minutes.
     var pollMinutes: Double
-    /// Treat a paused mower as a tray alert (it is stalled mid-job).
+    /// Treat a stalled mower as a menu bar alert.
     var alertOnPaused: Bool
     /// Height of the menu bar icon in points; width follows the artwork's aspect.
-    var trayIconHeight: Double
+    var menuBarIconHeight: Double
     /// How long a mower that has stopped appearing in the device list keeps its
     /// place in the menu, shown as offline. Zero disables the memory entirely.
     var rememberDays: Double
@@ -36,7 +36,7 @@ struct AppConfig: Codable, Equatable, Sendable {
         acceptLanguage: "en-US",
         pollMinutes: 5,
         alertOnPaused: true,
-        trayIconHeight: 15,
+        menuBarIconHeight: 15,
         rememberDays: 30,
         lastKnownMinutes: 10,
         notifyOnChange: true,
@@ -46,6 +46,8 @@ struct AppConfig: Codable, Equatable, Sendable {
     var isConfigured: Bool { !clientId.isEmpty && !clientSecret.isEmpty }
 
     var pollInterval: TimeInterval { max(30, pollMinutes * 60) }
+
+    private enum LegacyKeys: String, CodingKey { case trayIconHeight }
 
     /// Decode leniently so a hand-edited file with missing keys still loads.
     init(from decoder: Decoder) throws {
@@ -58,7 +60,16 @@ struct AppConfig: Codable, Equatable, Sendable {
         acceptLanguage = try c.decodeIfPresent(String.self, forKey: .acceptLanguage) ?? d.acceptLanguage
         pollMinutes = try c.decodeIfPresent(Double.self, forKey: .pollMinutes) ?? d.pollMinutes
         alertOnPaused = try c.decodeIfPresent(Bool.self, forKey: .alertOnPaused) ?? d.alertOnPaused
-        trayIconHeight = try c.decodeIfPresent(Double.self, forKey: .trayIconHeight) ?? d.trayIconHeight
+        // Renamed from `trayIconHeight`: "tray" is Windows, macOS has a menu
+        // bar. Configs written before the rename are still honoured.
+        if let explicit = try c.decodeIfPresent(Double.self, forKey: .menuBarIconHeight) {
+            menuBarIconHeight = explicit
+        } else if let legacy = try? decoder.container(keyedBy: LegacyKeys.self),
+                  let height = try? legacy.decodeIfPresent(Double.self, forKey: .trayIconHeight) {
+            menuBarIconHeight = height
+        } else {
+            menuBarIconHeight = d.menuBarIconHeight
+        }
         rememberDays = try c.decodeIfPresent(Double.self, forKey: .rememberDays) ?? d.rememberDays
         lastKnownMinutes = try c.decodeIfPresent(Double.self, forKey: .lastKnownMinutes) ?? d.lastKnownMinutes
         notifyOnChange = try c.decodeIfPresent(Bool.self, forKey: .notifyOnChange) ?? d.notifyOnChange
@@ -66,7 +77,7 @@ struct AppConfig: Codable, Equatable, Sendable {
     }
 
     init(clientId: String, clientSecret: String, authBaseURL: String, apiBaseURL: String,
-         acceptLanguage: String, pollMinutes: Double, alertOnPaused: Bool, trayIconHeight: Double,
+         acceptLanguage: String, pollMinutes: Double, alertOnPaused: Bool, menuBarIconHeight: Double,
          rememberDays: Double, lastKnownMinutes: Double,
          notifyOnChange: Bool, notifyOnRecovery: Bool) {
         self.clientId = clientId
@@ -76,7 +87,7 @@ struct AppConfig: Codable, Equatable, Sendable {
         self.acceptLanguage = acceptLanguage
         self.pollMinutes = pollMinutes
         self.alertOnPaused = alertOnPaused
-        self.trayIconHeight = trayIconHeight
+        self.menuBarIconHeight = menuBarIconHeight
         self.rememberDays = rememberDays
         self.lastKnownMinutes = lastKnownMinutes
         self.notifyOnChange = notifyOnChange

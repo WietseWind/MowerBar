@@ -3,7 +3,7 @@ import UserNotifications
 
 /// macOS notifications for mower state changes.
 ///
-/// The tray badge only tells you *something* is wrong once you look at the menu
+/// The menu bar badge only tells you *something* is wrong once you look at the
 /// bar; a mow that stalls while you are in another app should reach you without
 /// looking. Notifications fire on transitions only, never on the current state,
 /// so a paused mower nags once rather than every poll.

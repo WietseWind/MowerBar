@@ -230,7 +230,7 @@ there is nothing to call back to.
 | `lastKnownMinutes` | `10` | How long its last status still counts as meaningful |
 | `notifyOnChange` | `true` | Notify on pause / fault / offline |
 | `notifyOnRecovery` | `true` | Also notify when it picks back up |
-| `trayIconHeight` | `15` | Menu bar icon height, in points |
+| `menuBarIconHeight` | `15` | Menu bar icon height, in points |
 | `authBaseURL` / `apiBaseURL` | Mammotion | Endpoint overrides |
 | `acceptLanguage` | `en-US` | `Accept-Language` sent to the API |
 
