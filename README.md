@@ -122,7 +122,8 @@ credentials and talk to Mammotion directly.
   mower settling onto its dock to charge says nothing at all.
 - **Remember mowers.** One that drops off the device list keeps its place in the
   menu carrying its last known state, rather than silently vanishing.
-- Show firmware version, Wi-Fi/cellular signal and dock state per mower.
+- Show firmware version, dock state, and **both radios' signal** — Wi-Fi and
+  cellular, each with a rough percentage, marking which one is actually in use.
 - Open at login, and answer a `mowerbar://` URL scheme for scripting.
 
 ## What it cannot do
@@ -131,6 +132,9 @@ credentials and talk to Mammotion directly.
   This is a status-and-simple-commands tool.
 - **No task creation.** It can start a saved plan by name; it cannot make one.
 - **No live position, no camera, no path history.** The API does not expose them.
+- **No satellite count or RTK fix quality.** Not in any pollable endpoint. The
+  subscription API lists a `LOC_SRC` property, but the REST spec documents no way
+  to receive those events — no webhook, no MQTT endpoint.
 - **No mowing parameters** — height, speed, pattern. App only.
 - **No RTK base station management.** They appear on the account and are filtered
   out; they carry no status, battery or plan.
@@ -363,6 +367,12 @@ a test host and per-action endpoints that no longer exist.
 - `GET /v1/mower/{deviceId}` — adds version, status, batteryLevel, chargeStatus, network
 - `GET /v1/mower/{deviceId}/plan` — saved tasks
 - `POST /v1/mower/action` — `{deviceId, action, params:{taskName}}`
+
+`network` reports **both** radios on every call, regardless of which is carrying
+traffic — `wifiAvailable`/`wifiRssi` and `cellularAvailable`/`cellularRssi`, with
+`usedNetwork` naming the active one (`1` Wi-Fi, `2` cellular). The percentages
+MowerBar shows are a rule of thumb, linear over a 40 dB span (−50…−90 for Wi-Fi,
+−65…−105 for cellular), which is why the dBm figure stays next to them.
 
 `chargeStatus` is documented as `1` charging / `0` not, but `2` also occurs — and
 `2` has been observed at both 17% and 100% battery, so it does not mean "full".

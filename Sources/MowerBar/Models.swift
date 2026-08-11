@@ -34,17 +34,47 @@ struct DeviceInfo: Decodable, Sendable {
 }
 
 struct DeviceNetwork: Decodable, Sendable {
+    /// Which radio the mower is currently on: "1" Wi-Fi, "2" cellular.
     let usedNetwork: String?
+    let wifiAvailable: Bool?
     let wifiRssi: Int?
+    let cellularAvailable: Bool?
     let cellularRssi: Int?
 
-    /// "1" is Wi-Fi, "2" is cellular.
-    var summary: String? {
-        switch usedNetwork {
-        case "1": return wifiRssi.map { "Wi‑Fi \($0) dBm" } ?? "Wi‑Fi"
-        case "2": return cellularRssi.map { "Cellular \($0) dBm" } ?? "Cellular"
-        default: return nil
+    /// Signal is reported for *both* radios regardless of which one is carrying
+    /// traffic, which is worth showing: a mower about to walk out of Wi-Fi range
+    /// is a different prospect depending on whether it has cellular to fall back on.
+    var lines: [String] {
+        [
+            line("Wi‑Fi", rssi: wifiRssi, available: wifiAvailable, usedCode: "1",
+                 floor: -90, ceiling: -50),
+            line("Cellular", rssi: cellularRssi, available: cellularAvailable, usedCode: "2",
+                 floor: -105, ceiling: -65)
+        ].compactMap { $0 }
+    }
+
+    private func line(_ label: String, rssi: Int?, available: Bool?, usedCode: String,
+                      floor: Int, ceiling: Int) -> String? {
+        // Nothing to say about a radio the mower does not have.
+        guard available == true || rssi != nil else { return nil }
+
+        var text = label
+        if let rssi {
+            text += " \(rssi) dBm · \(Self.strength(rssi, floor: floor, ceiling: ceiling))%"
         }
+        if usedNetwork == usedCode { text += "  (in use)" }
+        return text
+    }
+
+    /// dBm means nothing to most people, so pair it with a percentage.
+    ///
+    /// Linear across a 40 dB span, with the endpoints set where each radio stops
+    /// being useful — around −50/−90 for Wi-Fi and −65/−105 for cellular. This is
+    /// a rule of thumb, not a measurement, which is exactly why the dBm figure
+    /// stays on screen next to it.
+    private static func strength(_ dBm: Int, floor: Int, ceiling: Int) -> Int {
+        let clamped = min(max(dBm, floor), ceiling)
+        return Int((Double(clamped - floor) / Double(ceiling - floor) * 100).rounded())
     }
 }
 

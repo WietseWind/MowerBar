@@ -169,7 +169,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         parts.append(mower.error ?? "")
         parts.append(mower.model ?? "")
         parts.append(mower.detail?.version ?? "")
-        parts.append(mower.detail?.network?.summary ?? "")
+        parts.append((mower.detail?.network?.lines ?? []).joined(separator: "/"))
         parts.append(mower.isDocked ? "docked" : "off")
         parts.append(mower.isCharging ? "charging" : "notcharging")
         parts.append(mower.isOnline ? "online" : "offline")
@@ -285,8 +285,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             let version = mower.detail?.version ?? ""
             submenu.addItem(disabled(version.isEmpty ? model : "\(model) · v\(version)"))
         }
-        if let network = mower.detail?.network?.summary {
-            submenu.addItem(disabled(network))
+        for line in mower.detail?.network?.lines ?? [] {
+            submenu.addItem(disabled(line))
         }
         submenu.addItem(disabled(mower.isDocked ? "On dock" : "Off dock"))
 
