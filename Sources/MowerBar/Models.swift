@@ -95,9 +95,16 @@ enum MowerStatus: String, Sendable {
 /// How a mower's state should read in the tray.
 enum MowerHealth: Sendable {
     case active     // green — doing what it should
+    case charging   // blue — on the dock, topping up, nothing to do
     case idle       // neutral — parked and fine
-    case attention  // amber — stalled mid-job
-    case alert      // red — offline or faulted
+    case alert      // red — offline, faulted, or stalled mid-job
+}
+
+/// Status plus whether it is on the dock — the pair needed to tell a mower
+/// stalled on the lawn from one sitting on its charger.
+struct MowerSnapshot: Equatable, Sendable {
+    let status: MowerStatus
+    let charging: Bool
 }
 
 // MARK: - Actions
@@ -180,15 +187,43 @@ struct MowerState: Sendable {
     private var isReachable: Bool { (detail?.online ?? info.online ?? 0) == 1 }
 
     var battery: Int? { detail?.batteryLevel }
-    var isCharging: Bool { detail?.chargeStatus == 1 }
-    /// `0` means the mower is off the dock; `1` charging, `2` docked and full.
+
+    /// `chargeStatus` is `0` off the dock and non-zero on it. Both `1` and `2`
+    /// have been observed on-dock (at 17% and at 100%), so only zero/non-zero
+    /// is treated as meaningful.
     var isDocked: Bool { (detail?.chargeStatus ?? 0) != 0 }
+
+    /// The API reports `Paused` for a mower sitting on its dock, which is a
+    /// completely different situation from one stopped mid-lawn. `chargeStatus`
+    /// is the only thing that separates them.
+    var isCharging: Bool {
+        guard isOnline, isDocked else { return false }
+        switch status {
+        case .paused, .standby: return true
+        default: return false
+        }
+    }
+
+    /// Paused, not on the dock: stopped in the middle of a job and going
+    /// nowhere until someone does something. The case this app exists for.
+    var isStalled: Bool { isOnline && status == .paused && !isDocked }
+
+    /// What the row should actually say, which is not always what the API said.
+    var stateLabel: String {
+        guard isCharging else { return status.label }
+        return (battery ?? 0) >= 100 ? "Docked" : "Charging"
+    }
+
+    var snapshot: MowerSnapshot { MowerSnapshot(status: status, charging: isCharging) }
 
     var health: MowerHealth {
         if !isOnline { return .alert }
+        // Checked before .paused: on the dock, paused means charging.
+        if isCharging { return .charging }
         switch status {
         case .offline, .abnormal: return .alert
-        case .paused: return .attention
+        // Stopped mid-job, off the dock — the worst of the recoverable states.
+        case .paused: return .alert
         case .working, .returning: return .active
         default: return .idle
         }
@@ -205,8 +240,8 @@ struct MowerState: Sendable {
             if let battery = lastKnown.battery { parts.append("\(battery)%") }
             return parts.joined(separator: " · ") + " · last known"
         }
-        var parts = [status.label]
-        if let battery { parts.append("\(battery)%\(isCharging ? " ⚡︎" : "")") }
+        var parts = [stateLabel]
+        if let battery { parts.append("\(battery)%") }
         return parts.joined(separator: " · ")
     }
 
@@ -220,7 +255,7 @@ struct MowerState: Sendable {
         case .working:
             return [.pause, .stop, .returnToDock]
         case .paused:
-            return [.resume, .stop, .returnToDock]
+            return isDocked ? [.resume, .stop] : [.resume, .stop, .returnToDock]
         case .returning:
             return [.cancelReturn, .stop]
         case .mapping, .updating, .abnormal, .offline, .unknown:

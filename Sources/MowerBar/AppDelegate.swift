@@ -81,10 +81,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             button.imagePosition = .imageOnly
         }
 
-        let attention = monitor.mowers.filter { $0.health == .alert || $0.health == .attention }
+        let attention = monitor.mowers.filter { $0.health == .alert }
         button.toolTip = attention.isEmpty
             ? "\(AppInfo.name) — \(monitor.mowers.count) mower\(monitor.mowers.count == 1 ? "" : "s")"
-            : "\(AppInfo.name) — " + attention.map { "\($0.name): \($0.status.label)" }.joined(separator: ", ")
+            : "\(AppInfo.name) — " + attention.map { "\($0.name): \($0.isStalled ? "stuck" : $0.stateLabel)" }
+                .joined(separator: ", ")
     }
 
     /// `labelColor` is appearance-dependent, so resolve it against the menu bar's
@@ -106,8 +107,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let color: NSColor
         switch health {
         case .active: color = .systemGreen
+        case .charging: color = .systemBlue
         case .idle: color = .tertiaryLabelColor
-        case .attention: color = .systemOrange
         case .alert: color = .systemRed
         }
         let image = MowerIcon.dot(color)
@@ -170,6 +171,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         parts.append(mower.detail?.version ?? "")
         parts.append(mower.detail?.network?.summary ?? "")
         parts.append(mower.isDocked ? "docked" : "off")
+        parts.append(mower.isCharging ? "charging" : "notcharging")
         parts.append(mower.isOnline ? "online" : "offline")
         if let lastSeen = mower.lastSeen {
             parts.append("seen:" + Self.relative(lastSeen))

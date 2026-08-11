@@ -20,7 +20,7 @@ final class FleetMonitor {
     private let notifier = Notifier()
     /// Baseline for change detection. Absent means "no baseline yet", which is
     /// why the first sync after launch never notifies.
-    private var previousStatus: [String: MowerStatus] = [:]
+    private var previousStatus: [String: MowerSnapshot] = [:]
     /// Commands the user just issued. The resulting status change is expected,
     /// so it should not come back as a notification.
     private var commandedAt: [String: Date] = [:]
@@ -160,7 +160,7 @@ final class FleetMonitor {
     /// worth interrupting for.
     private func announceChanges() {
         defer {
-            previousStatus = Dictionary(uniqueKeysWithValues: mowers.map { ($0.id, $0.status) })
+            previousStatus = Dictionary(uniqueKeysWithValues: mowers.map { ($0.id, $0.snapshot) })
         }
         guard config.notifyOnChange else { return }
 
@@ -170,7 +170,7 @@ final class FleetMonitor {
             guard let before = previousStatus[mower.id] else { continue }
             if let issued = commandedAt[mower.id], Date().timeIntervalSince(issued) < 45 { continue }
 
-            switch MowerEvent.between(before, mower.status, mower: mower) {
+            switch MowerEvent.between(before, mower.snapshot, mower: mower) {
             case .problem(let title, let body):
                 notifier.post(title: title, body: body, identifier: "\(mower.id)-\(mower.status.rawValue)")
             case .recovery(let title, let body):
@@ -274,14 +274,20 @@ final class FleetMonitor {
 
     // MARK: - Derived state
 
-    /// Red when something is genuinely wrong, amber when a job is stalled.
+    /// Red when a mower needs a human: offline, faulted, or stalled mid-job.
+    /// A mower charging on its dock is not one of those.
     var alertLevel: MowerHealth? {
         // Remembered mowers are seeded as offline before the first sync lands;
         // don't flash the badge red for them until we have actually checked.
         guard lastUpdate != nil else { return nil }
-        if mowers.contains(where: { $0.health == .alert }) { return .alert }
-        if config.alertOnPaused, mowers.contains(where: { $0.health == .attention }) { return .attention }
-        return lastError == nil ? nil : .alert
+        if lastError != nil { return .alert }
+
+        let raising = mowers.filter { $0.health == .alert }
+        if raising.contains(where: { !$0.isStalled }) { return .alert }
+        // A stall is always an alert in the menu; this setting only decides
+        // whether it also takes over the menu bar icon.
+        if config.alertOnPaused, raising.contains(where: \.isStalled) { return .alert }
+        return nil
     }
 
     var statusLine: String {

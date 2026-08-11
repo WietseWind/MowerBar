@@ -86,10 +86,12 @@ credentials and talk to Mammotion directly.
   the ones the mower can actually accept right now. A paused mower offers Resume,
   never Start.
 - Start a **saved task by name**, if you have plans set up in the Mammotion app.
-- **Badge the menu bar red** when anything is offline, faulted, or paused mid-job.
-- **Notify** on the transitions worth interrupting for — paused, faulted, went
-  offline, and optionally recovered. Transitions only: a paused mower nags once,
-  not every five minutes. A change you asked for yourself stays quiet.
+- **Badge the menu bar red** when a mower is stuck, faulted or offline — and
+  *not* when it is simply charging on its dock, which the API also calls "Paused".
+- **Notify** on the transitions worth interrupting for — stuck, faulted, went
+  offline, and optionally recovered. Transitions only: a stuck mower nags once,
+  not every five minutes. A change you asked for yourself stays quiet, and a
+  mower settling onto its dock to charge says nothing at all.
 - **Remember mowers.** One that drops off the device list keeps its place in the
   menu carrying its last known state, rather than silently vanishing.
 - Show firmware version, Wi-Fi/cellular signal and dock state per mower.
@@ -200,7 +202,8 @@ live alongside it. **All three are gitignored and none should ever be shared.**
 |---|---|
 | Standby | Start Mowing, Return to Dock *(only off the dock)*, Start Task ▸ *(if plans exist)* |
 | Working | Pause, Stop, Return to Dock |
-| Paused | Resume, Stop, Return to Dock |
+| Paused *(off dock — stuck)* | Resume, Stop, Return to Dock |
+| Charging / Docked | Resume, Stop |
 | Returning | Cancel Return, Stop |
 | Mapping / Updating / Abnormal / Offline | nothing |
 | out of reach (remembered) | nothing |
@@ -213,11 +216,25 @@ live alongside it. **All three are gitignored and none should ever be shared.**
 | | Meaning |
 |---|---|
 | 🟢 | Working or Returning |
+| 🔵 | Charging — on the dock, topping up, nothing to do |
 | ⚪ | Standby, Mapping, Updating |
-| 🟠 | Paused — stalled mid-job |
-| 🔴 | Offline, Abnormal, or out of reach |
+| 🔴 | **Stuck** — paused mid-job and off the dock — or Abnormal, Offline, out of reach |
 
-The menu bar badge goes red for amber *and* red rows.
+The menu bar badge goes red for any red row.
+
+### Paused is two different situations
+
+The API reports `Paused` for a mower stalled in the middle of the lawn *and* for
+one sitting on its dock charging. Those could not be more different — one costs
+you an afternoon, the other is the machine doing its job. `chargeStatus` is the
+only field that separates them, so MowerBar splits them:
+
+| status | chargeStatus | shown as | dot |
+|---|---|---|---|
+| `Paused` | `0` (off dock) | **Paused** — stuck, needs you | 🔴 |
+| `Paused` | non-zero (on dock) | **Charging** (or **Docked** at 100%) | 🔵 |
+
+Only the first raises the menu bar badge, and only the first sends a notification.
 
 ### Remembered mowers
 
@@ -313,8 +330,11 @@ a test host and per-action endpoints that no longer exist.
 - `GET /v1/mower/{deviceId}/plan` — saved tasks
 - `POST /v1/mower/action` — `{deviceId, action, params:{taskName}}`
 
-`chargeStatus` is documented as `1` charging / `0` not, but `2` also occurs — it
-means docked and full. Anything non-zero is treated as "on dock".
+`chargeStatus` is documented as `1` charging / `0` not, but `2` also occurs — and
+`2` has been observed at both 17% and 100% battery, so it does not mean "full".
+Only zero versus non-zero is treated as meaningful: `0` is off the dock, anything
+else is on it. That single bit is what separates a stuck mower from a charging
+one, since both report `Paused`.
 
 ## Licence
 

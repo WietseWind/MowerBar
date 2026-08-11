@@ -100,35 +100,45 @@ enum MowerEvent {
 
     /// Decides whether a transition deserves a notification.
     ///
-    /// Fires when a mower stops doing what it was doing — paused mid-job,
+    /// Fires when a mower stops doing what it was doing — stuck mid-job,
     /// faulted, or dropped off the network — and again when it picks back up.
-    /// Everything else (Standby → Working, battery ticking down) stays quiet.
-    static func between(_ before: MowerStatus, _ after: MowerStatus, mower: MowerState) -> MowerEvent? {
+    /// Everything else stays quiet.
+    ///
+    /// The subtlety is `Paused`. The API reports it both for a mower stalled in
+    /// the middle of the lawn and for one sitting on its dock charging. Only the
+    /// first is worth waking someone for, which is why this compares snapshots
+    /// carrying the dock state rather than bare statuses.
+    static func between(_ before: MowerSnapshot, _ after: MowerSnapshot, mower: MowerState) -> MowerEvent? {
         guard before != after else { return nil }
         let name = mower.name
 
-        func isTrouble(_ status: MowerStatus) -> Bool {
-            status == .paused || status == .abnormal || status == .offline
+        func isTrouble(_ snapshot: MowerSnapshot) -> Bool {
+            // On the dock, nothing is wrong — that is just charging.
+            guard !snapshot.charging else { return false }
+            return snapshot.status == .paused
+                || snapshot.status == .abnormal
+                || snapshot.status == .offline
         }
 
         if isTrouble(after) {
-            switch after {
+            let battery = mower.battery.map { " · \($0)% battery" } ?? ""
+            switch after.status {
             case .paused:
-                return .problem("\(name) paused",
-                                "Was \(before.label.lowercased())\(mower.battery.map { " · \($0)% battery" } ?? "").")
+                return .problem("\(name) is stuck",
+                                "Paused mid-job, off the dock\(battery).")
             case .abnormal:
                 return .problem("\(name) needs attention",
-                                "Reported an abnormal condition while \(before.label.lowercased()).")
+                                "Reported an abnormal condition\(battery).")
             case .offline:
                 return .problem("\(name) went offline",
-                                "No longer reachable. Last known state: \(before.label.lowercased()).")
+                                "No longer reachable. Last seen \(before.status.label.lowercased()).")
             default:
                 return nil
             }
         }
 
-        if isTrouble(before), after == .working || after == .returning || after == .standby {
-            return .recovery("\(name) is back", "Now \(after.label.lowercased()).")
+        if isTrouble(before), !isTrouble(after) {
+            return .recovery("\(name) is back", "Now \(mower.stateLabel.lowercased()).")
         }
         return nil
     }
