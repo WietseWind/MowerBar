@@ -126,6 +126,16 @@ credentials and talk to Mammotion directly.
   cellular, each with a rough percentage, marking which one is actually in use.
 - Open at login, and answer a `mowerbar://` URL scheme for scripting.
 
+<div align="center">
+
+<img src="docs/menu-signal.png" width="560" alt="A mower's submenu showing Wi-Fi -49 dBm · 100% (in use) above Cellular -75 dBm · 75%.">
+
+<sub>Signal is reported for both radios whether or not they are carrying traffic.<br>
+Knowing a mower at the edge of Wi-Fi still has 4G to fall back on is<br>
+the difference between "it might drop off" and "it will".</sub>
+
+</div>
+
 ## What it cannot do
 
 - **No map, no zones, no scheduling.** Use the Mammotion app for anything spatial.
