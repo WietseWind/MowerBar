@@ -346,6 +346,11 @@ artifact, or notarize your own.
 **Mowers missing.** Only 2025-and-newer models are covered by the Developer API,
 and the mower has to be on the same account the credentials came from.
 
+**Cannot paste into Settings (1.1.3 and earlier).** A menu bar app has no menu bar
+of its own, and macOS routes ⌘V through the main menu — with none installed, paste
+was never delivered anywhere. Fixed in 1.1.4. On older builds the workaround is to
+edit `config.json` directly.
+
 ## How it works
 
 | File | Role |

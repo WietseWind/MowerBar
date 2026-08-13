@@ -33,9 +33,11 @@ done
 
 APP="build/MowerBar.app"
 
-echo "==> swift build -c $CONFIGURATION ${ARCHS[*]}"
-swift build -c "$CONFIGURATION" "${ARCHS[@]}"
-BIN="$(swift build -c "$CONFIGURATION" "${ARCHS[@]}" --show-bin-path)/MowerBar"
+# macOS ships bash 3.2, where expanding an empty array under `set -u` is an
+# "unbound variable" error — so --native needs the ${arr[@]+"${arr[@]}"} form.
+echo "==> swift build -c $CONFIGURATION ${ARCHS[*]:-(host architecture)}"
+swift build -c "$CONFIGURATION" ${ARCHS[@]+"${ARCHS[@]}"}
+BIN="$(swift build -c "$CONFIGURATION" ${ARCHS[@]+"${ARCHS[@]}"} --show-bin-path)/MowerBar"
 
 echo "==> assembling $APP"
 rm -rf "$APP"

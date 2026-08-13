@@ -22,7 +22,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
     init(monitor: FleetMonitor) {
         self.monitor = monitor
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 500, height: 520),
+            contentRect: NSRect(x: 0, y: 0, width: 640, height: 540),
             styleMask: [.titled, .closable],
             backing: .buffered,
             defer: false
@@ -38,6 +38,13 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
 
     required init?(coder: NSCoder) { fatalError("init(coder:) is not used") }
 
+    /// Settings promotes the app to `.regular` so it can actually take keyboard
+    /// focus. Closing it goes straight back to menu-bar-only: no Dock tile, no
+    /// menu bar.
+    func windowWillClose(_ notification: Notification) {
+        NSApp.setActivationPolicy(.accessory)
+    }
+
     // MARK: - Layout
 
     private func buildLayout() {
@@ -51,6 +58,11 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
 
         clientIdField.placeholderString = "client_id"
         clientSecretField.placeholderString = "client_secret"
+        // Credentials are long opaque strings; a monospaced face makes them
+        // possible to eyeball, and both fields need to fit ~40 characters.
+        let credentialFont = NSFont.monospacedSystemFont(ofSize: 11, weight: .regular)
+        clientIdField.font = credentialFont
+        clientSecretField.font = credentialFont
         pollField.placeholderString = "5"
         pollField.alignment = .right
 
@@ -83,7 +95,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         grid.columnSpacing = 10
         grid.rowSpacing = 10
         grid.column(at: 0).xPlacement = .trailing
-        grid.column(at: 1).width = 300
+        grid.column(at: 1).width = 420
 
         let buttons = NSStackView(views: [NSView(), saveButton, signInButton])
         buttons.orientation = .horizontal

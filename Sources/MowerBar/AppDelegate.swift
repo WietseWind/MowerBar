@@ -54,10 +54,47 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             Task { @MainActor in self?.updateStatusItem() }
         }
 
+        installEditMenu()
         updateStatusItem()
         buildMenu()
         monitor.requestNotificationAuthorization()
         monitor.start()
+    }
+
+    /// A menu bar app displays no menu bar of its own, but AppKit still routes
+    /// ⌘X/⌘C/⌘V/⌘A/⌘Z through `NSApp.mainMenu.performKeyEquivalent(_:)` *before*
+    /// anything in the responder chain sees the keystroke. With no main menu at
+    /// all those shortcuts are never delivered, which made it impossible to
+    /// paste into the credential fields in Settings — exactly the two values
+    /// nobody types by hand.
+    ///
+    /// This menu is never shown. It exists only to carry the key equivalents.
+    /// Items have no target, so each one travels the responder chain to whatever
+    /// field editor is currently active.
+    private func installEditMenu() {
+        let mainMenu = NSMenu()
+
+        let appItem = NSMenuItem()
+        let appMenu = NSMenu()
+        appMenu.addItem(withTitle: "Quit \(AppInfo.name)",
+                        action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
+        appItem.submenu = appMenu
+        mainMenu.addItem(appItem)
+
+        let editItem = NSMenuItem()
+        let edit = NSMenu(title: "Edit")
+        edit.addItem(withTitle: "Undo", action: Selector(("undo:")), keyEquivalent: "z")
+        let redo = edit.addItem(withTitle: "Redo", action: Selector(("redo:")), keyEquivalent: "z")
+        redo.keyEquivalentModifierMask = [.command, .shift]
+        edit.addItem(.separator())
+        edit.addItem(withTitle: "Cut", action: Selector(("cut:")), keyEquivalent: "x")
+        edit.addItem(withTitle: "Copy", action: Selector(("copy:")), keyEquivalent: "c")
+        edit.addItem(withTitle: "Paste", action: Selector(("paste:")), keyEquivalent: "v")
+        edit.addItem(withTitle: "Select All", action: Selector(("selectAll:")), keyEquivalent: "a")
+        editItem.submenu = edit
+        mainMenu.addItem(editItem)
+
+        NSApp.mainMenu = mainMenu
     }
 
     // MARK: - Status item
@@ -372,8 +409,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         if settingsWindow == nil {
             settingsWindow = SettingsWindowController(monitor: monitor)
         }
+
+        // An `.accessory` app cannot reliably take keyboard focus: macOS shows
+        // the window but leaves the previously active app in front, so
+        // keystrokes never arrive — which is why pasting a client secret was
+        // impossible. Becoming a regular app for as long as Settings is open
+        // makes it a normal, focusable app and surfaces the Edit menu with it.
+        // `SettingsWindowController` drops back to `.accessory` on close.
+        NSApp.setActivationPolicy(.regular)
         NSApp.activate(ignoringOtherApps: true)
         settingsWindow?.showWindow(nil)
+        settingsWindow?.window?.makeKeyAndOrderFront(nil)
     }
 
     private func presentError(_ title: String, _ message: String) {
