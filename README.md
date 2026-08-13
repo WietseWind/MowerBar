@@ -9,7 +9,7 @@
 Status at a glance, a red dot when something stalls, and the handful of
 commands that actually make sense right now.
 
-<sub>macOS 13+ · native Swift + AppKit · zero dependencies · MIT</sub>
+<sub>macOS 13+ · Apple Silicon &amp; Intel · native Swift + AppKit · zero dependencies · MIT</sub>
 
 <img src="docs/menu.png" width="640" alt="The MowerBar menu: Kiki returning to its dock, Norah charging, Jones working, with the Cancel Return submenu open">
 
@@ -181,8 +181,9 @@ Then paste both into **Settings…** in the menu and press **Sign In**.
 Grab `MowerBar.zip` from [Releases](https://github.com/WietseWind/MowerBar/releases),
 unzip, drag `MowerBar.app` to `/Applications`, open it.
 
-Releases are signed with a Developer ID and notarized by Apple, so they open
-without a Gatekeeper fight. On first launch there are no credentials and it says
+Releases are **universal** — one download runs natively on both Apple Silicon and
+Intel — signed with a Developer ID and notarized by Apple, so they open without a
+Gatekeeper fight. On first launch there are no credentials and it says
 so — open **Settings…**, paste, **Sign In**.
 
 ## Build from source
@@ -193,7 +194,9 @@ cd MowerBar
 ./build.sh && open build/MowerBar.app
 ```
 
-That is an ad-hoc signed build — fine locally. For something you can hand to
+That produces a universal (arm64 + x86_64), ad-hoc signed build — fine locally.
+Add `--native` to build only for the machine you are on, which is quicker while
+iterating. For something you can hand to
 someone else:
 
 ```bash

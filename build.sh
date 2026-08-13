@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Builds MowerBar.app — a menu bar (LSUIElement) bundle.
 #
-#   ./build.sh                                   ad-hoc signed, for local use
+#   ./build.sh                                   universal, ad-hoc signed, local use
+#   ./build.sh --native                          host architecture only, faster
 #   ./build.sh --sign "Developer ID Application: Acme (TEAMID)"
 #   ./build.sh --sign "…" --notarize notarytool --dest ~/Desktop
 #
@@ -15,6 +16,9 @@ CONFIGURATION=release
 IDENTITY="-"
 NOTARY_PROFILE=""
 DEST=""
+# Release builds are universal so one download covers Apple Silicon and Intel.
+# --native drops to the host architecture only, which is faster to iterate on.
+ARCHS=(--arch arm64 --arch x86_64)
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -22,15 +26,16 @@ while [[ $# -gt 0 ]]; do
     --notarize)  NOTARY_PROFILE="$2"; shift 2 ;;
     --dest)      DEST="$2"; shift 2 ;;
     --debug)     CONFIGURATION=debug; shift ;;
+    --native)    ARCHS=(); shift ;;
     *) echo "unknown option: $1" >&2; exit 2 ;;
   esac
 done
 
 APP="build/MowerBar.app"
 
-echo "==> swift build -c $CONFIGURATION"
-swift build -c "$CONFIGURATION"
-BIN="$(swift build -c "$CONFIGURATION" --show-bin-path)/MowerBar"
+echo "==> swift build -c $CONFIGURATION ${ARCHS[*]}"
+swift build -c "$CONFIGURATION" "${ARCHS[@]}"
+BIN="$(swift build -c "$CONFIGURATION" "${ARCHS[@]}" --show-bin-path)/MowerBar"
 
 echo "==> assembling $APP"
 rm -rf "$APP"
@@ -38,6 +43,9 @@ mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$BIN" "$APP/Contents/MacOS/MowerBar"
 cp Resources/Info.plist "$APP/Contents/Info.plist"
 printf 'APPL????' > "$APP/Contents/PkgInfo"
+
+echo "==> architectures"
+lipo -info "$APP/Contents/MacOS/MowerBar" | sed 's/^/    /'
 
 echo "==> rendering icons"
 ICONSET="$(mktemp -d)/AppIcon.iconset"
