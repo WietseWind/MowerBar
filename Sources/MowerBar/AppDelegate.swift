@@ -26,6 +26,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     // jump, and collapses any open submenu. Instead the structure is built once
     // per fleet change and then updated in place, guarded by these signatures.
     private var mowerItems: [String: NSMenuItem] = [:]
+    private var eventMenus: [String: RecentEventsMenu] = [:]
     private var titleSignatures: [String: String] = [:]
     private var submenuSignatures: [String: String] = [:]
     private var builtForIds: [String] = []
@@ -181,6 +182,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     private func update(_ item: NSMenuItem, for mower: MowerState) {
+        eventMenus[mower.id]?.mowerName = mower.name
         let title = "\(mower.name) — \(mower.summary)"
         let titleSignature = "\(title)|\(mower.health)"
         if titleSignatures[mower.id] != titleSignature {
@@ -203,10 +205,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         parts.append(mower.availableActions.map(\.rawValue).joined(separator: ","))
         parts.append(mower.startableTasks.compactMap(\.taskName).joined(separator: ","))
         parts.append(mower.status.label)
-        parts.append(mower.error ?? "")
-        parts.append(mower.model ?? "")
-        parts.append(mower.detail?.version ?? "")
-        parts.append((mower.detail?.network?.lines ?? []).joined(separator: "/"))
+        parts.append(mower.detailLines.joined(separator: "/"))
         parts.append(mower.isDocked ? "docked" : "off")
         parts.append(mower.isCharging ? "charging" : "notcharging")
         parts.append(mower.isOnline ? "online" : "offline")
@@ -224,6 +223,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         titleSignatures.removeAll()
         submenuSignatures.removeAll()
         builtForIds = monitor.mowers.map(\.id)
+        eventMenus = eventMenus.filter { builtForIds.contains($0.key) }
         builtWithNotificationsBlocked = monitor.notificationsBlocked
 
         if !monitor.config.isConfigured {
@@ -307,25 +307,29 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
 
         if actions.isEmpty && tasks.isEmpty {
-            submenu.addItem(disabled(mower.isOnline ? "No actions while \(mower.status.label.lowercased())"
-                                                    : "Out of reach"))
+            let reason = mower.status == .unknown ? "Actions unavailable until status is known"
+                : "No actions while \(mower.status.label.lowercased())"
+            submenu.addItem(disabled(mower.isOnline ? reason : "Out of reach"))
         }
 
         submenu.addItem(.separator())
-        if let error = mower.error {
-            submenu.addItem(disabled(error))
-        }
+        let events = eventMenus[mower.id] ?? RecentEventsMenu(
+            mowerName: mower.name,
+            history: RecentEventsHistory { [api = monitor.api, id = mower.id] in
+                try await api.recentEvents(id)
+            }
+        )
+        eventMenus[mower.id] = events
+        let eventItem = NSMenuItem(title: "Recent Events", action: nil, keyEquivalent: "")
+        eventItem.submenu = events.menu
+        submenu.addItem(eventItem)
+        submenu.addItem(.separator())
         if let lastSeen = mower.lastSeen {
             submenu.addItem(disabled("Last seen \(Self.relative(lastSeen))"))
         }
-        if let model = mower.model {
-            let version = mower.detail?.version ?? ""
-            submenu.addItem(disabled(version.isEmpty ? model : "\(model) · v\(version)"))
-        }
-        for line in mower.detail?.network?.lines ?? [] {
+        for line in mower.detailLines {
             submenu.addItem(disabled(line))
         }
-        submenu.addItem(disabled(mower.isDocked ? "On dock" : "Off dock"))
 
         let copy = NSMenuItem(title: "Copy Device ID", action: #selector(copyDeviceId(_:)), keyEquivalent: "")
         copy.target = self

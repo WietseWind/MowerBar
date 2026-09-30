@@ -65,6 +65,15 @@ actor MammotionAPI {
         try await get("/v1/mower/\(encoded(deviceId))/plan", as: [WorkTask].self)
     }
 
+    func recentEvents(_ deviceId: String) async throws -> [MowerHistoryEvent] {
+        var request = URLRequest(url: try url(for: "/v1/mower/error-codes/search"))
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONEncoder().encode(RecentEventsQuery(deviceId: deviceId))
+        let page = try decode(await authorizedData(request), as: MowerHistoryPage.self)
+        return page.records
+    }
+
     @discardableResult
     func send(_ action: MowerAction, to deviceId: String, taskName: String? = nil) async throws -> String {
         var body: [String: Any] = ["deviceId": deviceId, "action": action.rawValue]

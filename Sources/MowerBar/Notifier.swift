@@ -110,6 +110,8 @@ enum MowerEvent {
     /// carrying the dock state rather than bare statuses.
     static func between(_ before: MowerSnapshot, _ after: MowerSnapshot, mower: MowerState) -> MowerEvent? {
         guard before != after else { return nil }
+        // Missing or unfamiliar telemetry is not evidence of recovery.
+        guard after.status != .unknown else { return nil }
         let name = mower.name
 
         func isTrouble(_ snapshot: MowerSnapshot) -> Bool {

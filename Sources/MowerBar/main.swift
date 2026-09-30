@@ -23,8 +23,7 @@ if let index = CommandLine.arguments.firstIndex(of: "--render-icons"),
 //
 // It drives the real FleetMonitor rather than re-querying the API itself, so
 // the remembered-mower merge and the action gating shown here cannot drift from
-// what the menu does. Respects HOME, which makes it runnable against a throwaway
-// support directory.
+// what the menu does. MOWERBAR_SUPPORT_DIR selects a throwaway support directory.
 if CommandLine.arguments.contains("--status") {
     var finished = false
     Task { @MainActor in
@@ -44,6 +43,27 @@ if CommandLine.arguments.contains("--status") {
             \(String(describing: mower.health).padding(toLength: 10, withPad: " ", startingAt: 0)) \
             \(actions.isEmpty ? "—" : actions.joined(separator: ", "))\(seen)
             """)
+            if CommandLine.arguments.contains("--verbose") {
+                for line in mower.detailLines { print("  \(line)") }
+            }
+            if CommandLine.arguments.contains("--events") {
+                let history = RecentEventsHistory { try await monitor.api.recentEvents(mower.id) }
+                await history.refresh()
+                print("  Recent events (last 30 days, up to 10):")
+                if let error = history.error {
+                    print("    Could not load events: \(error)")
+                } else if history.events.isEmpty {
+                    print("    No events in the last 30 days")
+                } else {
+                    for event in history.events {
+                        print("    \(event.timestamp) · \(event.explanation)")
+                        if let code = event.code { print("      Event code: \(code)") }
+                        if let advice = event.advice {
+                            for line in advice.components(separatedBy: .newlines) { print("      \(line)") }
+                        }
+                    }
+                }
+            }
         }
         finished = true
     }

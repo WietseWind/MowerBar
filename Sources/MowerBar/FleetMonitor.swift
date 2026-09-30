@@ -111,7 +111,7 @@ final class FleetMonitor {
                             let detail = try await api.detail(device.id)
                             state.detail = detail
                             // Plans are only actionable from Standby, so only pay for them there.
-                            if MowerStatus(detail.status) == .standby, detail.online == 1 {
+                            if state.status == .standby, state.isOnline {
                                 state.tasks = (try? await api.tasks(device.id)) ?? []
                             }
                         } catch {
@@ -125,10 +125,9 @@ final class FleetMonitor {
                 return collected.sorted { $0.0 < $1.0 }.map(\.1)
             }
 
-            // A device whose detail carries no status is not a mower (RTK base
-            // stations answer /v1/mowers too). Keep failures so they stay visible.
-            let live = states.filter { $0.detail == nil || $0.detail?.status != nil }
-            mowers = merge(live: live)
+            // Offline mowers legitimately omit status. RTK stations are already
+            // filtered by model; missing telemetry must never hide a mower.
+            mowers = merge(live: states)
             notifier.refreshStatus()
             announceChanges()
             lastUpdate = Date()
@@ -201,8 +200,8 @@ final class FleetMonitor {
             record.lastSeen = now
             // Only overwrite the remembered status when we actually read one —
             // a failed detail call should not erase what we last knew.
-            if let status = mower.detail?.status, !status.isEmpty {
-                record.lastStatus = status
+            if mower.isOnline, mower.status != .unknown {
+                record.lastStatus = mower.status.rawValue
                 record.lastBattery = mower.detail?.batteryLevel
                 record.lastStateAt = now
             }
@@ -256,6 +255,12 @@ final class FleetMonitor {
     /// trails the command by a few seconds.
     func send(_ action: MowerAction, to deviceId: String, taskName: String? = nil,
               onFailure: @escaping (String) -> Void) {
+        // URL commands and menu clicks must obey the same current-state rules.
+        guard let mower = mowers.first(where: { $0.id == deviceId }),
+              mower.allows(action, taskName: taskName) else {
+            onFailure("That command is not available in the mower's current state. Refresh its status and try again.")
+            return
+        }
         // A status change the user just asked for is not news.
         commandedAt[deviceId] = Date()
         Task { [weak self] in

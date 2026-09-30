@@ -38,6 +38,7 @@ struct DeviceNetwork: Decodable, Sendable {
     let usedNetwork: String?
     let wifiAvailable: Bool?
     let wifiRssi: Int?
+    let wifiIp: String?
     let cellularAvailable: Bool?
     let cellularRssi: Int?
 
@@ -45,12 +46,16 @@ struct DeviceNetwork: Decodable, Sendable {
     /// traffic, which is worth showing: a mower about to walk out of Wi-Fi range
     /// is a different prospect depending on whether it has cellular to fall back on.
     var lines: [String] {
-        [
+        var result = [
             line("Wi‑Fi", rssi: wifiRssi, available: wifiAvailable, usedCode: "1",
                  floor: -90, ceiling: -50),
             line("Cellular", rssi: cellularRssi, available: cellularAvailable, usedCode: "2",
                  floor: -105, ceiling: -65)
         ].compactMap { $0 }
+        if let wifiIp, !wifiIp.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            result.append("Wi‑Fi IP: \(wifiIp)")
+        }
+        return result
     }
 
     private func line(_ label: String, rssi: Int?, available: Bool?, usedCode: String,
@@ -100,11 +105,15 @@ enum MowerStatus: String, Sendable {
     case standby, working, paused, mapping, updating, offline, returning, abnormal
     case unknown
 
-    /// The API documents `Standby` but has been observed emitting `StandBy`,
-    /// so match case-insensitively.
+    /// The API now emits `Mowing` and `TaskPaused` for `Working` and `Paused`.
+    /// Keep both spellings, including for statuses saved by older releases.
     init(_ raw: String?) {
         let value = raw?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() ?? ""
-        self = MowerStatus(rawValue: value) ?? .unknown
+        switch value {
+        case "mowing": self = .working
+        case "taskpaused": self = .paused
+        default: self = MowerStatus(rawValue: value) ?? .unknown
+        }
     }
 
     var label: String {
@@ -206,7 +215,7 @@ struct MowerState: Sendable {
     var model: String? { detail?.model ?? info.model }
 
     var isOnline: Bool {
-        (detail?.online ?? info.online ?? 0) == 1 && status != .offline
+        !isRemembered && isReachable && status != .offline
     }
 
     var status: MowerStatus {
@@ -240,8 +249,35 @@ struct MowerState: Sendable {
 
     /// What the row should actually say, which is not always what the API said.
     var stateLabel: String {
+        if status == .unknown { return "Status unavailable" }
         guard isCharging else { return status.label }
         return (battery ?? 0) >= 100 ? "Docked" : "Charging"
+    }
+
+    /// Keep unfamiliar API values visible without guessing which commands they allow.
+    var statusDiagnostic: String? {
+        guard isOnline, status == .unknown else { return nil }
+        if let raw = detail?.status?.trimmingCharacters(in: .whitespacesAndNewlines), !raw.isEmpty {
+            return "Unrecognized mower status: \(raw)"
+        }
+        return "Mower status was not returned"
+    }
+
+    var dockLabel: String {
+        guard isOnline, let chargeStatus = detail?.chargeStatus else { return "Dock state unavailable" }
+        return chargeStatus == 0 ? "Off dock" : "On dock"
+    }
+
+    /// Shared by the submenu and verbose CLI so diagnostics cannot drift apart.
+    var detailLines: [String] {
+        var lines = [error, statusDiagnostic].compactMap { $0 }
+        if let model {
+            let version = detail?.version ?? ""
+            lines.append(version.isEmpty ? model : "\(model) · v\(version)")
+        }
+        lines += detail?.network?.lines ?? []
+        lines.append(dockLabel)
+        return lines
     }
 
     var snapshot: MowerSnapshot { MowerSnapshot(status: status, charging: isCharging) }
@@ -251,7 +287,7 @@ struct MowerState: Sendable {
         // Checked before .paused: on the dock, paused means charging.
         if isCharging { return .charging }
         switch status {
-        case .offline, .abnormal: return .alert
+        case .offline, .abnormal, .unknown: return .alert
         // Stopped mid-job, off the dock — the worst of the recoverable states.
         case .paused: return .alert
         case .working, .returning: return .active
@@ -277,7 +313,7 @@ struct MowerState: Sendable {
 
     /// Only offer commands the mower can actually accept right now.
     var availableActions: [MowerAction] {
-        guard isOnline else { return [] }
+        guard isOnline, error == nil else { return [] }
         switch status {
         case .standby:
             // A task-less start is the only start that works when no plan exists.
@@ -295,7 +331,15 @@ struct MowerState: Sendable {
 
     /// Saved plans are only startable from Standby, and only by name.
     var startableTasks: [WorkTask] {
-        guard isOnline, status == .standby else { return [] }
+        guard isOnline, error == nil, status == .standby else { return [] }
         return tasks.filter { ($0.taskName?.isEmpty == false) }
+    }
+
+    func allows(_ action: MowerAction, taskName: String? = nil) -> Bool {
+        if action == .start {
+            guard let taskName else { return false }
+            return startableTasks.contains { $0.taskName == taskName }
+        }
+        return availableActions.contains(action)
     }
 }

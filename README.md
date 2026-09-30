@@ -82,8 +82,8 @@ Read this bit. Really.
 - **Not affiliated with, endorsed by, or supported by Mammotion.** No relationship
   with the manufacturer whatsoever. "Mammotion", "Luba" and "Yuka" are their
   trademarks, used here only to say which hardware this talks to.
-- **Weekend-project maturity.** Written fast, tested against exactly one account
-  and three mowers. No test suite. Expect rough edges.
+- **Weekend-project maturity.** Tested against one account and three mowers,
+  with regression tests for status handling. Expect rough edges.
 - **Provided as-is, no warranty** (see [LICENSE](LICENSE)). If it stops your mow
   mid-lawn, drives into a flowerbed, or misses an alert you were counting on,
   that is on you.
@@ -124,6 +124,13 @@ credentials and talk to Mammotion directly.
   menu carrying its last known state, rather than silently vanishing.
 - Show firmware version, dock state, and **both radios' signal** — Wi-Fi and
   cellular, each with a rough percentage, marking which one is actually in use.
+  Show the Wi-Fi IP address when the API supplies it.
+- Flag unavailable status and show unfamiliar API values in the submenu, so a
+  change upstream is visible instead of making the mower look idle.
+- Show **Recent Events** for each mower: up to ten events from the last 30 days,
+  newest first. Click an event for its full explanation and Mammotion's suggested
+  remedy. Events include routine charging and rest stops as well as faults;
+  timestamps help explain how a mower reached its current state.
 - Open at login, and answer a `mowerbar://` URL scheme for scripting.
 
 <div align="center">
@@ -141,11 +148,12 @@ the difference between "it might drop off" and "it will".</sub>
 - **No map, no zones, no scheduling.** Use the Mammotion app for anything spatial.
   This is a status-and-simple-commands tool.
 - **No task creation.** It can start a saved plan by name; it cannot make one.
-- **No live position, no camera, no path history.** The API does not expose them.
-- **No satellite count or RTK fix quality.** Not in any pollable endpoint. The
-  subscription API lists a `LOC_SRC` property, but the REST spec documents no way
-  to receive those events — no webhook, no MQTT endpoint.
-- **No mowing parameters** — height, speed, pattern. App only.
+- **No live position, camera, path history, satellite count or RTK fix quality
+  in MowerBar.** The API now documents SSE subscriptions for position, tracks
+  and location-source data, limited to **LUBA 3 AWD**. This app still polls REST.
+- **No mowing parameters or work history in the menu yet.** The API now exposes
+  these endpoints, but our Luba 2s return zero-filled parameters and an error
+  for work-report searches. MowerBar does not present those as useful readings.
 - **No RTK base station management.** They appear on the account and are filtered
   out; they carry no status, battery or plan.
 - **No real-time push.** It polls. A change shows up within one poll interval
@@ -207,6 +215,9 @@ xcrun notarytool store-credentials "notarytool" --apple-id you@example.com --tea
            --dest ~/Desktop
 ```
 
+Run the status, action-gating, notification, and recent-events regression tests
+with `swift test`.
+
 ## Authentication, honestly
 
 There is **no browser sign-in**, because the API has no such thing.
@@ -251,6 +262,7 @@ live alongside it. **All three are gitignored and none should ever be shared.**
 | Charging / Docked | Resume, Stop |
 | Returning | Cancel Return, Stop |
 | Mapping / Updating / Abnormal / Offline | nothing |
+| Unavailable or unrecognized status | nothing |
 | out of reach (remembered) | nothing |
 
 `START` needs a task name and only works with saved plans. With no plans,
@@ -264,6 +276,7 @@ live alongside it. **All three are gitignored and none should ever be shared.**
 | 🔵 | Charging — on the dock, topping up, nothing to do |
 | ⚪ | Standby, Mapping, Updating |
 | 🔴 | **Stuck** — paused mid-job and off the dock — or Abnormal, Offline, out of reach |
+| 🔴 | Status unavailable — check the submenu for the API value or request error |
 
 The menu bar badge goes red for any red row.
 
@@ -312,6 +325,24 @@ mowerbar://mower/<deviceId>/<start|pause|resume|stop|return|cancel_return>
 ```
 
 Device IDs come from **Copy Device ID** in a mower's submenu.
+URL commands follow the same status and availability checks as the menu.
+
+## Recent events
+
+Open a mower's submenu, then **Recent Events**. History loads on demand and is
+cached in memory for five minutes. **Refresh Events** fetches it immediately.
+It is queried from the cloud even for an offline or remembered mower, so past
+events may still explain how it went out of reach.
+
+Selecting a timestamped row opens its complete explanation, event code, and any
+suggested action returned by Mammotion. This is historical context: an older
+event does not prove the cause of the current status, and routine low-battery
+recharges appear in the same history as faults. History never changes live
+status, command availability, or notification behavior.
+
+If a refresh fails, the submenu shows the error and retains any previously
+fetched events with their last update time. A history failure does not prevent
+normal mower polling.
 
 ## CLI
 
@@ -321,6 +352,10 @@ The app binary doubles as a status dump, driving the same code path the menu doe
 ```bash
 /Applications/MowerBar.app/Contents/MacOS/MowerBar --status
 ```
+
+Add `--verbose` to include the submenu's diagnostic details: request errors,
+unrecognized statuses, firmware, network signals, Wi-Fi IP when supplied, and dock state.
+Add `--events` to fetch and print recent events and suggested remedies as well.
 
 ```
 Kiki           Paused · 89%               attention  Resume, Stop, Return to Dock
@@ -359,6 +394,8 @@ edit `config.json` directly.
 | `MammotionAPI.swift` | token lifecycle, endpoints, 401 retry |
 | `FleetMonitor.swift` | polling loop, fleet snapshot, remembering, commands |
 | `Models.swift` | API shapes, status enum, **which actions each status allows** |
+| `RecentEvents.swift` | historical event decoding, timestamps, query window, and cache |
+| `RecentEventsMenu.swift` | lazy history submenu and full event details |
 | `AppDelegate.swift` | status item and menu, updated in place |
 | `Notifier.swift` | notification permission, transition → message mapping |
 | `MowerIcon.swift` | the mower, drawn as vector art (menu bar + app icon) |
@@ -384,7 +421,27 @@ a test host and per-action endpoints that no longer exist.
 - `GET /v1/mowers` — id, name, nickname, model, icon, online
 - `GET /v1/mower/{deviceId}` — adds version, status, batteryLevel, chargeStatus, network
 - `GET /v1/mower/{deviceId}/plan` — saved tasks
+- `POST /v1/mower/error-codes/search` — recent events, timestamps, and suggested remedies
 - `POST /v1/mower/action` — `{deviceId, action, params:{taskName}}`
+
+Checked on 2026-09-30 against the current
+[Swagger page](https://developer.mammotion.com/apis/debug/mowing), which loads
+that live spec. The spec still documents `Working`, but our online Luba 2s now
+return **`Mowing`**. Saved fleet history also contains **`TaskPaused`** in place
+of `Paused`. MowerBar recognizes both new values and the original spellings.
+An offline mower may
+return only identity, firmware, and `online: 0`, omitting status and battery;
+it stays in the fleet. RTK stations are filtered by model, not by missing status.
+
+The spec also adds work-report searches and summaries, fault history with
+suggested solutions, current work parameters, LAN connection tickets, and an SSE
+connection guide. SSE subscriptions are explicitly limited to LUBA 3 AWD.
+Fault history works on our Luba 2s and powers the Recent Events submenu. The
+`gmtCreate` timestamp is milliseconds since Unix epoch; `createTime` is used
+only when that event timestamp is absent. Severity and priority may be null.
+Work-report searches and summaries returned API code `40200`; work parameters
+returned all-zero values. Those capabilities still need model-specific validation
+before they can become useful menu features.
 
 `network` reports **both** radios on every call, regardless of which is carrying
 traffic — `wifiAvailable`/`wifiRssi` and `cellularAvailable`/`cellularRssi`, with
